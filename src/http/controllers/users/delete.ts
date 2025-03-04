@@ -1,27 +1,19 @@
-import { FastifyRequest, FastifyReply } from "fastify"
-import { z } from "zod"
-import { PrismaUsersRepository } from "@/repositories/prisma/prisma-users-repository"
-import { ResourceNotFindError } from "@/use-cases/errors/resource-not-found-error"
-import { DeleteUserUseCase } from "@/use-cases/delete-user-use-case"
+import { FastifyRequest, FastifyReply } from "fastify";
+import { prisma } from "@/lib/prisma";
 
 export async function deleteUser(request: FastifyRequest, reply: FastifyReply) {
-    const updateParamsSchema = z.object({
-        userId: z.coerce.number() 
-    })
+    const { id } = request.params as { id: string };
 
-    const { userId } = updateParamsSchema.parse(request.params)
+    if (Number(id) !== request.user.sub) {
+        return reply.status(403).send({ message: "Você só pode deletar sua própria conta" });
+    }
 
     try {
-        const prismaUsersRepository = new PrismaUsersRepository()
-        const deleteUserUseCase = new DeleteUserUseCase(prismaUsersRepository)
+        await prisma.user.delete({ where: { id: Number(id) } });
 
-        await deleteUserUseCase.execute({ userId }) 
-
-        return reply.status(204).send() 
+        return reply.status(204).send();
     } catch (err) {
-        if (err instanceof ResourceNotFindError) {
-            return reply.status(404).send({ message: err.message });
-        }
-        throw err
+        console.error("ERRO AO DELETAR USUÁRIO:", err);
+        return reply.status(500).send({ message: "Erro interno ao deletar usuário" });
     }
 }

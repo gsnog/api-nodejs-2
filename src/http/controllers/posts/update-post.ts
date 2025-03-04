@@ -1,41 +1,35 @@
 import { FastifyRequest, FastifyReply } from "fastify";
+import { prisma } from "@/lib/prisma";
 import { z } from "zod";
-import { UpdatePostUseCase } from "@/use-cases/update-post-use-case";
-import { PrismaPostRepository } from "@/repositories/prisma/prisma-posts-repositories";
-import { ResourceNotFindError } from "@/use-cases/errors/resource-not-found-error";
 
 export async function updatePost(request: FastifyRequest, reply: FastifyReply) {
-    console.log("Recebida requisição para atualizar post.");
+    const { id } = request.params as { id: string };
 
-    const updateParamsSchema = z.object({
-        id: z.coerce.number()
+    const post = await prisma.post.findUnique({
+        where: { id: Number(id) }
     });
 
-    const updateBodySchema = z.object({
+    if (!post || post.userId !== request.user.sub) {
+        return reply.status(403).send({ message: "Você só pode atualizar seus próprios posts" });
+    }
+
+    const updatePostSchema = z.object({
         titulo: z.string().optional(),
-        conteudo: z.string().optional()
+        conteudo: z.string().optional(),
     });
-
-    const { id } = updateParamsSchema.parse(request.params);
-    const { titulo, conteudo } = updateBodySchema.parse(request.body);
 
     try {
-        const prismaPostRepository = new PrismaPostRepository();
-        const updatePostUseCase = new UpdatePostUseCase(prismaPostRepository);
+        const data = updatePostSchema.parse(request.body);
 
-        const { post } = await updatePostUseCase.execute({ id, titulo, conteudo });
+        const updatedPost = await prisma.post.update({
+            where: { id: Number(id) },
+            data
+        });
 
-        return reply.status(200).send(post);
+        return reply.status(200).send(updatedPost);
     } catch (err) {
         console.error("ERRO AO ATUALIZAR POST:", err);
-
-        if (err instanceof ResourceNotFindError) {
-            return reply.status(404).send({ message: err.message });
-        }
-
-        return reply.status(500).send({
-            message: "Erro interno ao atualizar post",
-            error: err instanceof Error ? err.stack : "Erro desconhecido"
-        });
+        return reply.status(500).send({ message: "Erro interno ao atualizar post" });
     }
 }
+

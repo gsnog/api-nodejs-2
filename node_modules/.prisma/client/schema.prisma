@@ -14,19 +14,45 @@ datasource db {
 }
 
 model User {
-  id       Int    @id @default(autoincrement())
-  nome     String
-  email    String @unique
-  password String
-  foto     String
-  posts    Post[]
+  id          Int          @id @default(autoincrement())
+  nome        String
+  email       String       @unique
+  password    String
+  foto        String
+  posts       Post[]
+  comentarios Comentario[]
+  likes       Like[]
 }
 
 model Post {
+  id          Int          @id @default(autoincrement())
+  titulo      String       @unique
+  conteudo    String
+  created_at  DateTime     @default(now())
+  userId      Int
+  user        User         @relation(fields: [userId], references: [id])
+  comentarios Comentario[]
+  likes       Like[]
+}
+
+model Comentario {
   id         Int      @id @default(autoincrement())
-  titulo     String   @unique
   conteudo   String
   created_at DateTime @default(now())
   userId     Int
   user       User     @relation(fields: [userId], references: [id])
+  postId     Int
+  post       Post     @relation(fields: [postId], references: [id])
+  likes      Like[]
+}
+
+model Like {
+  id           Int         @id @default(autoincrement())
+  created_at   DateTime    @default(now())
+  userId       Int
+  user         User        @relation(fields: [userId], references: [id])
+  postId       Int?
+  post         Post?       @relation(fields: [postId], references: [id])
+  comentarioId Int?
+  comentario   Comentario? @relation(fields: [comentarioId], references: [id])
 }

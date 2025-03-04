@@ -1,28 +1,23 @@
 import { FastifyRequest, FastifyReply } from "fastify";
-import { z } from "zod";
-import { ResourceNotFindError } from "@/use-cases/errors/resource-not-found-error";
-import { PrismaPostRepository } from "@/repositories/prisma/prisma-posts-repositories";
-import { DeletePostUseCase } from "@/use-cases/delete-post-use-case";
+import { prisma } from "@/lib/prisma";
 
 export async function deletePost(request: FastifyRequest, reply: FastifyReply) {
-    const updateParamsSchema = z.object({
-        id: z.coerce.number(),
+    const { id } = request.params as { id: string };
+
+    const post = await prisma.post.findUnique({
+        where: { id: Number(id) }
     });
 
-    const { id } = updateParamsSchema.parse(request.params);
+    if (!post || post.userId !== request.user.sub) {
+        return reply.status(403).send({ message: "Você só pode deletar seus próprios posts" });
+    }
 
     try {
-        const prismaPostRepository = new PrismaPostRepository();
-        const deletePostUseCase = new DeletePostUseCase(prismaPostRepository);
+        await prisma.post.delete({ where: { id: Number(id) } });
 
-        await deletePostUseCase.execute({ id });
-
-        return reply.status(204).send(); 
+        return reply.status(204).send();
     } catch (err) {
-        if (err instanceof ResourceNotFindError) {
-            return reply.status(404).send({ message: err.message });
-        }
-        console.error(err); 
-        return reply.status(500).send({ message: 'Internal Server Error' });
+        console.error("ERRO AO DELETAR POST:", err);
+        return reply.status(500).send({ message: "Erro interno ao deletar post" });
     }
 }
